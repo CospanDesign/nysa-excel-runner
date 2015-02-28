@@ -98,7 +98,6 @@ class SDBComponentBranch(BranchNode):
             child = SDBEntryNode(self, "Date", date, self.depth)
             self.insertChild(child)
 
-
     def orderKey(self):
         return self.name
 
@@ -315,14 +314,17 @@ class SDBTreeModel(TreeTableModel):
 
 class SDBTree(QTreeView):
 
-    def __init__(self, parent = None):
+    def __init__(self, actions, status, parent = None):
         super (SDBTree, self).__init__(parent)
+        self.actions = actions
+        self.status = status
         self.som = None
         self.setUniformRowHeights(True)
         self.m = SDBTreeModel(parent)
         self.setModel(self.m)
         self.expand(self.rootIndex())
         self.setMaximumWidth(1000)
+        self.clicked.connect(self.user_clicked)
 
     def set_som(self, som):
         self.m.set_som(som)
@@ -339,4 +341,22 @@ class SDBTree(QTreeView):
         super(SDBTree, self).expandAll()
         self.resize_columns()
 
+    def user_clicked(self, index):
+        node = self.m.nodeFromIndex(index)
+        if isinstance(node, SDBEntryNode):
+            node = node.parent
+
+        if isinstance(node, RootBusBranch):
+            self.actions.device_selected.emit("")
+            return
+
+        if isinstance(node, SDBBusBranch):
+            self.actions.device_selected.emit("")
+            return
+
+        component = node.component
+        bus = node.parent
+        root = bus.parent
+        urn = "/%s/%s/%s" % (root.get_name(), bus.get_name(), component.get_name())
+        self.actions.device_selected.emit(urn)
 

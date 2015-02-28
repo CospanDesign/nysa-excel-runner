@@ -34,16 +34,18 @@ from PyQt4.Qt import *
 
 
 
-class ExcelTaskRunnerError(Exception):
+class ExcelEngineError(Exception):
     pass
 
-class ExcelTaskRunnerWorker(QObject):
-    def __init__(self):
-        super (ExcelTaskRunnerWorker, self).__init__()
-    
-    @pyqtSlot(object, object, object, object, float, object)
-    def thread_init(self, engine, driver, mutex, status, delay, actions):
-        self.driver = driver
+class ExcelEngineWorker(QObject):
+
+    def __init__(self, actions, status):
+        super (ExcelEngineWorker, self).__init__()
+        self.actions = actions
+        self.status = status
+
+    @pyqtSlot(object, object, object, float, object)
+    def thread_init(self, engine, mutex, status, delay, actions):
         self.status = status
         self.engine = engine
         self.mutex = mutex
@@ -58,23 +60,23 @@ class ExcelTaskRunnerWorker(QObject):
 
         self.status.Verbose("Initializing worker")
 
-class ExcelTaskRunner(QWidget):
-    def __init__(self, driver, status, actions):
-        super (ExcelTaskRunner, self).__init__()
+class ExcelEngine(QWidget):
+    def __init__(self, actions, status):
+        super (ExcelEngine, self).__init__()
+
         self.actions = actions
         self.status = status
-        self.driver = driver
         self.delay = 0.010
+
         self.thread = QThread()
         self.thread.start()
         self.mutex = QMutex()
-        self.worker = ExcelTaskRunnerWorker()
+        self.worker = ExcelEngineWorker(self.actions, self.status)
         self.worker.moveToThread(self.thread)
         QMetaObject.invokeMethod(self.worker,
                                     "thread_init",
                                     Qt.QueuedConnection,
                                     Q_ARG(object, self),
-                                    Q_ARG(object, self.driver),
                                     Q_ARG(object, self.mutex),
                                     Q_ARG(object, self.status),
                                     Q_ARG(float, self.delay),
@@ -110,3 +112,6 @@ class ExcelTaskRunner(QWidget):
         layout.addWidget(self.delay_le)
         layout.addWidget(self.execute_status)
         self.setLayout(layout)
+
+
+

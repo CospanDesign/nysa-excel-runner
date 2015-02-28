@@ -43,7 +43,7 @@ class NysaSelector(QWidget):
         self.platform_list.itemSelectionChanged.connect(self.platform_selection_changed)
         self.platform_list.setSelectionMode(QAbstractItemView.SingleSelection)
 
-        self.sdb_tree = SDBTree(self)
+        self.sdb_tree = SDBTree(self.actions, self.status, self)
 
         expand_all_button = QPushButton("Expand All")
         expand_all_button.clicked.connect(self.sdb_tree.expandAll)
@@ -104,7 +104,4 @@ class NysaSelector(QWidget):
         self.sdb_tree.clear()
         self.sdb_tree.set_som(som)
         self.sdb_tree.expandAll()
-
-    def device_selection_changed(self):
-        pass
 

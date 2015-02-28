@@ -88,9 +88,10 @@ class RegisterView(QWidget):
         self.show()
 
     def clear(self):
+        layout = self.layout()
         while layout.count():
             child = layout.takeAt(0)
-            c.widget().deleteLater()
+            child.widget().deleteLater()
         self.initialize()
 
     def initialize(self):

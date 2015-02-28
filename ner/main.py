@@ -38,15 +38,23 @@ import xlwt
 from nysa_selector import NysaSelector
 from file_interface import FileInterface
 from common.register_view import RegisterView
+from excel.excel_engine import ExcelEngine
+from excel.utils import create_excel_workbook
+
+from driver.excel_driver import ExcelDriver
 
 
 class Actions(QObject):
     scan_platforms = pyqtSignal(name = "platform_scan")
     platform_selection_changed = pyqtSignal(str, str, name = "platform_selection_changed")
+
     create_empty_excel = pyqtSignal(name = "create_empty_excel")
     create_example_excel = pyqtSignal(name = "create_example_excel")
     save_file = pyqtSignal(name = "save_file")
     load_file = pyqtSignal(name = "load_file")
+
+    device_selected = pyqtSignal(str, name = "device_selected")
+
 
 class MainView(QWidget):
     def __init__(self, actions, status):
@@ -57,10 +65,12 @@ class MainView(QWidget):
         self.nysa_selector = NysaSelector(self.actions, self.status)
         self.file_interface = FileInterface(self.actions, self.status)
         self.register_viewer = RegisterView(self.actions, self.status)
+        self.excel_engine = ExcelEngine(self.actions, self.status)
         layout.addWidget(self.nysa_selector)
         layout.addWidget(self.file_interface)
 
         playout = QHBoxLayout()
+        playout.addWidget(self.excel_engine)
         playout.addWidget(self.register_viewer)
 
         layout.addLayout(playout)
@@ -71,6 +81,12 @@ class MainView(QWidget):
 
     def get_file_interface(self):
         return self.file_interface
+
+    def get_register_view(self):
+        return self.register_viewer
+
+    def get_excel_engine(self):
+        return self.excel_engine
 
 class MainForm(QMainWindow):
     def __init__(self, actions, status):
@@ -87,6 +103,12 @@ class MainForm(QMainWindow):
     def get_file_interface(self):
         return self.mv.get_file_interface()
 
+    def get_register_view(self):
+        return self.mv.get_register_view()
+
+    def get_excel_engine(self):
+        return self.exel_engine
+
 class NysaExcelRunner(QObject):
     def __init__(self, debug):
         super (NysaExcelRunner, self).__init__()
@@ -97,14 +119,16 @@ class NysaExcelRunner(QObject):
         self.mf = MainForm(self.actions, self.status)
         self.ns = self.mf.get_nysa_selector()
         self.fi = self.mf.get_file_interface()
+        self.rw = self.mf.get_register_view()
         self.actions.scan_platforms.connect(self.scan_platforms)
         self.actions.create_empty_excel.connect(self.create_empty_excel)
         self.actions.create_example_excel.connect(self.create_example_excel)
         self.actions.save_file.connect(self.save_file)
         self.actions.load_file.connect(self.load_file)
-        self.scan_platforms()
+        self.actions.device_selected.connect(self.device_selected)
         self.platform = None
-        self.device = None
+        self.driver = None
+        self.scan_platforms()
 
         if debug:
             self.status.set_level("verbose")
@@ -146,7 +170,8 @@ class NysaExcelRunner(QObject):
             return
         platform = platforms[board_id]
         self.platform = platform
-        self.device = None
+        self.driver = None
+        self.device_selected("")
         self.scan_devices()
 
     def scan_devices(self):
@@ -157,10 +182,22 @@ class NysaExcelRunner(QObject):
     def create_empty_excel(self):
         self.status.Important("Create Empty Excel File")
         filepath = self.fi.get_save_filepath()
+        #filepath = os.path.join(os.path.expanduser("~"), "sandbox", "file_test.xls")
+        workbook = create_excel_workbook()
+        workbook.save(filepath)
+
 
     def create_example_excel(self):
         self.status.Important("Create Example Excel File")
-        filepath = self.fi.get_save_filepath()
+        #filepath = self.fi.get_save_filepath()
+        filepath = os.path.join(os.path.expanduser("~"), "sandbox", "file_test.xls")
+        setup_sheet = workbook.get_sheet(0)
+        loop_sheet = workbook.get_sheet(1)
+        result_sheet = workbook.get_sheet(2)
+
+        #print "dir: Workbook: %s" % str(dir(workbook))
+        #print "dir: Worksheet: %s" % str(sheet)
+
 
     def save_file(self):
         self.status.Important("Save File")
@@ -172,6 +209,25 @@ class NysaExcelRunner(QObject):
             return
         if not os.path.exists(filepath):
             self.status.Error("%s Doesn't exists!" % filepath)
+
+    def device_selected(self, urn):
+        self.rw.clear()
+        self.rw.update()
+        if urn is None:
+            self.status.Verbose("Nothing selected")
+        if len(urn) == 0:
+            self.status.Verbose("Nothing selected")
+            self.rw.clear()
+            return
+        self.status.Important("%s Selected" % urn)
+        self.driver = ExcelDriver(self.platform, urn, self.status)
+        size = self.driver.get_size()
+        print "Size: %d" % size
+        if size > 16:
+            self.status.Warning("Size Truncated to 16")
+            size = 16
+        for r in range(size):
+            self.rw.add_register(r, str(r), initial_value = self.driver.read_register(r))
 
 if __name__ == "__main__":
     ner = NysaExcelRunner(True)
